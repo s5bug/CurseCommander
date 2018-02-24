@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.text.Font?>
+<?import javafx.scene.text.Text?>
+
+<fx:root maxHeight="1.7976931348623157E308" maxWidth="560.0" prefHeight="100" prefWidth="560.0" type="javafx.scene.layout.BorderPane" xmlns="http://javafx.com/javafx/8.0.121" xmlns:fx="http://javafx.com/fxml/1">
+   <top>
+      <Text fx:id="modName" strokeType="OUTSIDE" strokeWidth="0.0" text="Mod Name" wrappingWidth="560.0" BorderPane.alignment="CENTER">
+         <font>
+            <Font size="36.0" />
+         </font>
+      </Text>
+   </top>
+   <bottom>
+      <Text fx:id="modDesc" strokeType="OUTSIDE" strokeWidth="0.0" text="Mod Desc" wrappingWidth="560.0" BorderPane.alignment="CENTER" />
+   </bottom>
+   <right>
+      <Text fx:id="modID" strokeType="OUTSIDE" strokeWidth="0.0" text="Mod ID" BorderPane.alignment="CENTER" />
+   </right>
+</fx:root>

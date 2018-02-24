@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.layout.HBox?>
+
+
+<fx:root prefHeight="15.0" prefWidth="200.0" type="javafx.scene.layout.HBox" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/8.0.121">
+   <children>
+      <CheckBox fx:id="modName" mnemonicParsing="false" selected="true" text="Mod Name" />
+   </children>
+</fx:root>
