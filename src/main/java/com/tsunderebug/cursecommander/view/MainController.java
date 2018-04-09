@@ -2,12 +2,16 @@ package com.tsunderebug.cursecommander.view;
 
 import com.tsunderebug.cursecommander.model.*;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
+import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ListView;
 import javafx.scene.control.TextField;
 import javafx.scene.input.MouseButton;
@@ -19,14 +23,13 @@ import javafx.stage.FileChooser;
 import static scala.collection.JavaConverters.*;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class MainController {
+	@FXML
+	public ChoiceBox<String> versionSelector;
 	@FXML
 	private TextField searchField;
 	@FXML
@@ -38,36 +41,68 @@ public class MainController {
 	@FXML
 	private Button downloadButton;
 
-	private Task<List<ModSearchResult>> downloadTask;
+	private Map<GameVersionID, Thread> downloadTasks = new HashMap<>();
+	private Map<GameVersionID, Integer> page = new HashMap<>();
+	private Map<GameVersionID, Set<ModSearchResult>> totalDownloaded = new HashMap<>();
+
+	private Collection<GameVersionID> allVersions = asJavaCollection(GameVersionID$.MODULE$.all().toIterable());
+
+	private GameVersionID selectedVersion = GameVersionID$.MODULE$.latestStable();
 
 	private Set<ModSearchResult> selected = new HashSet<>();
 
 	public MainController() {
-		downloadTask = new Task<>() {
+
+	}
+
+	public void switchToGameVersion(GameVersionID gv) {
+		if(!totalDownloaded.containsKey(gv)) {
+			totalDownloaded.put(gv, new HashSet<>());
+		}
+		if(downloadTasks.containsKey(selectedVersion)) {
+			downloadTasks.get(selectedVersion).interrupt();
+			downloadTasks.remove(selectedVersion);
+		}
+		updateEntryList(gv);
+		selectedVersion = gv;
+		createDownloadTask(selectedVersion);
+	}
+
+	public void updateEntryList(GameVersionID gv) {
+		Set<ModSearchResult> l = totalDownloaded.getOrDefault(gv, new HashSet<>());
+		List<MainEntryController> lmec = l.stream().sorted().filter(msr -> msr.name().toLowerCase().contains(searchField.getCharacters().toString().toLowerCase())).map(msr -> {
+			MainEntryController m = new MainEntryController();
+			m.setModNameText(msr.name());
+			m.setModDescText(msr.smallDesc());
+			m.setModIDText(msr.id());
+			m.setMsr(msr);
+			m.setOnMouseClicked(event -> {
+				if(event.getButton() == MouseButton.PRIMARY) {
+					addMod(msr);
+				} else if (event.getButton() == MouseButton.SECONDARY) {
+					removeMod(msr);
+				}
+				webView.getEngine().load(msr.link().toString());
+			});
+			return m;
+		}).collect(Collectors.toList());
+		Platform.runLater(() -> mainList.getItems().setAll(lmec));
+	}
+
+	public void createDownloadTask(GameVersionID gv) {
+		Task<List<ModSearchResult>> task = new Task<List<ModSearchResult>>() {
 			@Override
 			protected List<ModSearchResult> call() {
-				return Search.getAllSafeJ(GameVersionID$.MODULE$.latestStable(), SortType.Name$.MODULE$, l -> {
-					List<MainEntryController> lmec = l.stream().map(msr -> {
-						MainEntryController m = new MainEntryController();
-						m.setModNameText(msr.name());
-						m.setModDescText(msr.smallDesc());
-						m.setModIDText(msr.id());
-						m.setMsr(msr);
-						m.setOnMouseClicked(event -> {
-							if(event.getButton() == MouseButton.PRIMARY) {
-								addMod(msr);
-							} else if (event.getButton() == MouseButton.SECONDARY) {
-								removeMod(msr);
-							}
-							webView.getEngine().load(msr.link().toString());
-						});
-						return m;
-					}).collect(Collectors.toList());
-					Platform.runLater(() -> mainList.getItems().setAll(lmec));
+				return Search.getAllSafeJ(gv, SortType.Name$.MODULE$, page.getOrDefault(gv, 1), l -> {
+					totalDownloaded.getOrDefault(gv, new HashSet<>()).addAll(l);
+					updateEntryList(gv);
+					page.put(gv, page.getOrDefault(gv, 1) + 1);
 				});
 			}
 		};
-		new Thread(downloadTask).start();
+		Thread t = new Thread(task);
+		downloadTasks.put(gv, t);
+		t.start();
 	}
 
 	@FXML
@@ -96,6 +131,15 @@ public class MainController {
 				Platform.runLater(() -> downloadButton.setDisable(false));
 			}).start();
 		});
+		searchField.textProperty().addListener(((observable, oldValue, newValue) -> {
+			updateEntryList(selectedVersion);
+		}));
+		versionSelector.getItems().setAll(allVersions.stream().map(GameVersionID::name).collect(Collectors.toList()));
+		versionSelector.valueProperty().addListener((observable, oldValue, newValue) -> {
+			GameVersionID nv = allVersions.stream().filter(fv -> fv.name().equals(newValue)).findFirst().get();
+			switchToGameVersion(nv);
+		});
+		versionSelector.setValue(selectedVersion.name());
 	}
 
 	public void addMod(ModSearchResult msr) {
@@ -114,14 +158,16 @@ public class MainController {
 	}
 
 	public void addModSub(ModSearchResult msr) {
-		selected.add(msr);
-		asJavaCollection(msr.dependencies().toIterable()).forEach((i) -> {
-			try {
-				Thread.sleep(200);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			addModSub(i);
+		Platform.runLater(() -> {
+			selected.add(msr);
+			asJavaCollection(msr.dependencies().toIterable()).forEach(i -> {
+				try {
+					Thread.sleep(200);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				addModSub(i);
+			});
 		});
 	}
 
@@ -131,14 +177,16 @@ public class MainController {
 	}
 
 	public void removeModSub(ModSearchResult msr) {
-		selected.remove(msr);
-		asJavaCollection(msr.dependents().toIterable()).forEach((i) -> {
-			try {
-				Thread.sleep(200);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-			removeModSub(i);
+		Platform.runLater(() -> {
+			selected.remove(msr);
+			asJavaCollection(msr.dependents().toIterable()).forEach(i -> {
+				try {
+					Thread.sleep(200);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				removeModSub(i);
+			});
 		});
 	}
 

@@ -3,7 +3,7 @@ package com.tsunderebug.cursecommander.model
 import java.net.URI
 import scala.collection.JavaConverters._
 
-case class ModSearchResult(name: String, id: String, smallDesc: String) {
+case class ModSearchResult(name: String, id: String, smallDesc: String) extends Comparable[ModSearchResult] {
 
   def link: URI = new URI(s"https://minecraft.curseforge.com/projects/$id")
   def files: Traversable[ModFile] = {
@@ -49,6 +49,17 @@ case class ModSearchResult(name: String, id: String, smallDesc: String) {
         val desc = descp.html
         ModSearchResult(name, id, desc)
     }
+  }
+
+  override def equals(obj: scala.Any): Boolean = {
+    obj match {
+      case msr: ModSearchResult => msr.id == this.id
+      case _ => false
+    }
+  }
+
+  override def compareTo(o: ModSearchResult): Int = {
+    this.name.compare(o.name)
   }
 
 }

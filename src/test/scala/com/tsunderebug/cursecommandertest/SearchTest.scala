@@ -1,17 +1,14 @@
 package com.tsunderebug.cursecommandertest
 
-import com.tsunderebug.cursecommander.model.{ModSearchResult, Search}
+import java.io.File
+import java.net.URI
+
+import com.tsunderebug.cursecommander.model.RequestUtil
 
 object SearchTest {
 
   def main(args: Array[String]): Unit = {
-    var i = 0
-    println(Search().foldLeft(Seq[ModSearchResult]())((acc, t) => {
-      i = i + 1
-      println(s"$i/107")
-      Thread.sleep(200)
-      acc ++ t
-    }))
+    RequestUtil.downloadFileTo(new URI("https://minecraft.curseforge.com/projects/pams-harvestcraft/files/2533991/download"), new File("dab.jar"))
   }
 
 }
