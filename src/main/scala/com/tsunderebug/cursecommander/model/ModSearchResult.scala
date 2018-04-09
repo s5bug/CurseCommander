@@ -1,24 +1,33 @@
 package com.tsunderebug.cursecommander.model
 
 import java.net.URI
+
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 
 case class ModSearchResult(name: String, id: String, smallDesc: String) extends Comparable[ModSearchResult] {
 
   def link: URI = new URI(s"https://minecraft.curseforge.com/projects/$id")
   def files: Traversable[ModFile] = {
-    val doc = RequestUtil.request(new URI(s"https://minecraft.curseforge.com/projects/$id/files"))
-    val listContainer = doc.select(".listing > tbody").first()
-    listContainer.children().asScala.map {
-      e =>
-        val nameContainer = e.children().select(".project-file-name .project-file-name-container").first()
-        val nameDiv = nameContainer.children().first()
-        val name = nameDiv.html
-        val link = nameDiv.attr("abs:href")
-        val versionDiv = e.children().select(".project-file-game-version .version-label").first()
-        val version = versionDiv.html
-        ModFile(name, new URI(link), version)
-    }
+    val totalFiles: ListBuffer[ModFile] = ListBuffer()
+    val pdoc = RequestUtil.request(new URI(s"https://minecraft.curseforge.com/projects/$id/files"))
+    val totalPages = Math.max(1, pdoc.select(".listing-header .b-pagination-list > .b-pagination-item").size() - 1)
+    (1 to totalPages).foreach((pageNum) => {
+      Thread.sleep(200) // No DoS here folks
+      val doc = RequestUtil.request(new URI(s"https://minecraft.curseforge.com/projects/$id/files?page=$pageNum"))
+      val listContainer = doc.select(".listing > tbody").first()
+      totalFiles ++= listContainer.children().asScala.map {
+        e =>
+          val nameContainer = e.children().select(".project-file-name .project-file-name-container").first()
+          val nameDiv = nameContainer.children().first()
+          val name = nameDiv.html
+          val link = nameDiv.attr("abs:href")
+          val versionDiv = e.children().select(".project-file-game-version .version-label").first()
+          val version = versionDiv.html
+          ModFile(name, new URI(link), version)
+      }
+    })
+    totalFiles
   }
   def latest: ModFile = files.head
   def latest(mcVersion: String): ModFile = files.filter(_.mcVersion == mcVersion).head

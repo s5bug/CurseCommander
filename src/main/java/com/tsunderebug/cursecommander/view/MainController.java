@@ -112,18 +112,23 @@ public class MainController {
 			DirectoryChooser fileChooser = new DirectoryChooser();
 			fileChooser.setTitle("Choose Download Directory");
 			File downloadTo = fileChooser.showDialog(Main.instance);
-			List<ModFile> downloadables = selectedList.getItems().stream().map(InstallationEntryController::getMsr).map(msr -> asJavaCollection(msr.files().toIterable()).stream().sorted((mf1, mf2) -> {
+			List<Optional<ModFile>> downloadables = selectedList.getItems().stream().map(InstallationEntryController::getMsr).map(msr -> asJavaCollection(msr.files().toIterable()).stream().filter(modFile -> {
+				System.out.println("mfmcv: " + modFile.mcVersion());
+				return modFile.mcVersion().equals(selectedVersion.name());
+			}).sorted((mf1, mf2) -> {
 				String ml1 = mf1.link().toString();
 				String ml2 = mf2.link().toString();
 				return Integer.parseInt(ml2.substring(ml2.lastIndexOf('/') + 1)) - Integer.parseInt(ml1.substring(ml1.lastIndexOf('/') + 1));
-			}).findFirst().get()).collect(Collectors.toList());
+			}).findFirst()).collect(Collectors.toList());
 			new Thread(() -> {
 				final AtomicInteger p = new AtomicInteger();
 				downloadables.forEach(modFile -> {
 					int pr = p.incrementAndGet();
 					Platform.runLater(() -> downloadButton.setText("Downloading (" + pr + "/" + selected.size() + ")"));
 					try {
-						modFile.downloadTo(downloadTo);
+						if(modFile.isPresent()) {
+							modFile.get().downloadTo(downloadTo);
+						}
 					} catch (Exception e) {
 						e.printStackTrace();
 					}
@@ -168,6 +173,7 @@ public class MainController {
 				}
 				addModSub(i);
 			});
+			Platform.runLater(() -> selectedList.getItems().setAll(selectedEntryControllers()));
 		});
 	}
 
